@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 BATCHSIZE=12
 INPUT_SHAPE = (13,)
 OLD_TEST, SANITY = False, False    # What to do with the constructed model
-PRINT_WEIGHTS, PLOT_WEIGHTS_HISTOGRAM = False, True
+PRINT_WEIGHTS, PLOT_WEIGHTS_HISTOGRAM = False,False
 
 data = tf.keras.datasets.boston_housing.load_data(test_split=0.2, seed=113)
 x_train, y_train, x_test, y_test = \
@@ -21,7 +21,7 @@ x_train, y_train, x_test, y_test = \
 def make_model1():
     inputs = tf.keras.Input(shape=INPUT_SHAPE)
     layer1 = tf.keras.layers.Dense( 64, activation='sigmoid')(inputs)
-    layer2f1 = tf.keras.layers.Dense(3, activation='sigmoid')
+    layer2f1 = tf.keras.layers.Dense(30, activation='sigmoid')
     layer2f2 = layer2f1(layer1) # f for fixed
     layer2f1.trainable=False
     layer2t1 = tf.keras.layers.Dense(48, activation='sigmoid')
@@ -44,14 +44,31 @@ def make_model2():
 model2, init_t_weights_2, layer2t1_2 = make_model2()
 model2.summary()
 
+def make_model3():
+    inputs = tf.keras.Input(shape=INPUT_SHAPE)
+    layer1 = tf.keras.layers.Dense( 64, activation='sigmoid')(inputs)
+    layer2t1 = tf.keras.layers.Dense(48, activation='sigmoid')
+    layer2 = layer2t1(layer1) # t for trainable
+    layer3 = tf.keras.layers.Dense(1, activation='sigmoid')(layer2)
+    _model = tf.keras.Model( inputs, layer3 )
+    return _model, layer2t1.get_weights(), layer2t1
+model3, init_t_weights_2, layer2t1_2 = make_model2()
+model3.summary()
+
 #------ run models ------
 loss_fn = tf.keras.losses.MeanSquaredError()
+loss_fn = tf.keras.losses.Huber()
 model1.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.001) ,
         loss=loss_fn, metrics=['accuracy'])
-model1.fit(x_train, y_train, epochs=50)
-model2.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.001) ,
+history1=model1.fit(x_train, y_train, epochs=500, verbose=1)
+
+model2.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01) ,
     loss=loss_fn, metrics=['accuracy'])
-model2.fit(x_train, y_train, epochs=50)
+history2=model2.fit(x_train, y_train, epochs=500, verbose=1)
+plt.plot(history1.history['loss'])
+plt.show()
+plt.plot(history2.history['loss'])
+plt.show()
 
 if PRINT_WEIGHTS:
     print('*'*33)
@@ -78,10 +95,10 @@ if PRINT_WEIGHTS:
 if PLOT_WEIGHTS_HISTOGRAM :
     print('Plotting...')
     d_hist = {}
-    model_diffs = np.ndarray.flatten(np.array(
-            (layer2t1_2.get_weights()[0])))
-    model_diffs = np.ndarray.flatten(np.array(
-            (layer2t1_1.get_weights()[0])))
+#    model_diffs = np.ndarray.flatten(np.array(
+#            (layer2t1_1.get_weights()[0])))
+#    plt.hist(model_diffs)
+#    plt.show()
     model_diffs = np.ndarray.flatten(np.array(
             (init_t_weights_1[0] - layer2t1_1.get_weights()[0])))
     X = list(model_diffs )
