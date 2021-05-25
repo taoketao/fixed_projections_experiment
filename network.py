@@ -6,15 +6,20 @@ import os, sys
 import numpy as np
 from matplotlib import pyplot as plt
 
-BATCHSIZE=12
-INPUT_SHAPE = (13,)
-OLD_TEST, SANITY = False, False    # What to do with the constructed model
-PRINT_WEIGHTS, PLOT_WEIGHTS_HISTOGRAM = False,False
+BATCHSIZE=1 
+OLD_TEST, SANITY = False, True    # What to do with the constructed model
+PRINT_WEIGHTS, PLOT_WEIGHTS_HISTOGRAM = True, True
 
 data = tf.keras.datasets.boston_housing.load_data(test_split=0.2, seed=113)
+INPUT_SHAPE = (13,)
+def normalize(a, axis=-1, order=2):
+    l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
+    l2[l2==0] = 1
+    return a / np.expand_dims(l2, axis)
 x_train, y_train, x_test, y_test = \
-        [tf.convert_to_tensor(d) for d in \
+        [tf.convert_to_tensor(d/np.mean(d)) for d in \
         (data[0][0], data[0][1], data[1][0], data[1][1])]
+
 #print (data[0][0].shape, data[0][1].shape, data[1][0].shape, data[1][1].shape, )
 
 #------ build models ------
@@ -44,27 +49,17 @@ def make_model2():
 model2, init_t_weights_2, layer2t1_2 = make_model2()
 model2.summary()
 
-def make_model3():
-    inputs = tf.keras.Input(shape=INPUT_SHAPE)
-    layer1 = tf.keras.layers.Dense( 64, activation='sigmoid')(inputs)
-    layer2t1 = tf.keras.layers.Dense(48, activation='sigmoid')
-    layer2 = layer2t1(layer1) # t for trainable
-    layer3 = tf.keras.layers.Dense(1, activation='sigmoid')(layer2)
-    _model = tf.keras.Model( inputs, layer3 )
-    return _model, layer2t1.get_weights(), layer2t1
-model3, init_t_weights_2, layer2t1_2 = make_model2()
-model3.summary()
 
 #------ run models ------
 loss_fn = tf.keras.losses.MeanSquaredError()
 loss_fn = tf.keras.losses.Huber()
-model1.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.001) ,
+model1.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.0003) ,
         loss=loss_fn, metrics=['accuracy'])
-history1=model1.fit(x_train, y_train, epochs=500, verbose=1)
+history1=model1.fit(x_train, y_train, epochs=2000, verbose=1)
 
-model2.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01) ,
+model2.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0003) ,
     loss=loss_fn, metrics=['accuracy'])
-history2=model2.fit(x_train, y_train, epochs=500, verbose=1)
+history2=model2.fit(x_train, y_train, epochs=2000, verbose=1)
 plt.plot(history1.history['loss'])
 plt.show()
 plt.plot(history2.history['loss'])
@@ -82,12 +77,12 @@ if PRINT_WEIGHTS:
     print(init_f_weights_1[0] - layer2f1_1.get_weights()[0])
     print('*'*33)
 
-    #print('*'*33)
-    #print ('model 2 initial trainable weights:')
-    #print(init_t_weights_1[0])
-    #print ('model 2 end trainable weights:')
-    #print(layer2t1_1.get_weights()[0])
-    #
+    print('*'*33)
+    print ('model 2 initial trainable weights:')
+    print(init_t_weights_1[0])
+    print ('model 2 end trainable weights:')
+    print(layer2t1_1.get_weights()[0])
+    
 
 
 
@@ -95,10 +90,10 @@ if PRINT_WEIGHTS:
 if PLOT_WEIGHTS_HISTOGRAM :
     print('Plotting...')
     d_hist = {}
-#    model_diffs = np.ndarray.flatten(np.array(
-#            (layer2t1_1.get_weights()[0])))
-#    plt.hist(model_diffs)
-#    plt.show()
+    model_diffs = np.ndarray.flatten(np.array(
+            (layer2t1_1.get_weights()[0])))
+    plt.hist(model_diffs)
+    plt.show()
     model_diffs = np.ndarray.flatten(np.array(
             (init_t_weights_1[0] - layer2t1_1.get_weights()[0])))
     X = list(model_diffs )
@@ -116,8 +111,8 @@ if PLOT_WEIGHTS_HISTOGRAM :
 
 if SANITY:
     print('>> y_true ', y_train[:1])
-    print('>> y_pred ', model1(x_train[:1]))
-    print('>> mse    ',loss_fn(y_train[:1], model1(x_train[:1]).numpy()))
+    print('>> y_pred ', model2(x_train[:1]))
+    print('>> mse    ',loss_fn(y_train[:1], model2(x_train[:1]).numpy()))
 
 # test:
 if OLD_TEST:
