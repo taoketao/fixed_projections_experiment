@@ -3,83 +3,104 @@
 print('\t <><> Beginning Script <><>')
 import tensorflow as tf
 import os, sys
+import numpy as np
+from matplotlib import pyplot as plt
 
 BATCHSIZE=12
 INPUT_SHAPE = (13,)
-OLD_TEST, DEV = False, False    # What to do with the constructed model
-
+OLD_TEST, SANITY = False, False    # What to do with the constructed model
+PRINT_WEIGHTS, PLOT_WEIGHTS_HISTOGRAM = False, True
 
 data = tf.keras.datasets.boston_housing.load_data(test_split=0.2, seed=113)
 x_train, y_train, x_test, y_test = \
         [tf.convert_to_tensor(d) for d in \
         (data[0][0], data[0][1], data[1][0], data[1][1])]
-print (data[0][0].shape, data[0][1].shape, data[1][0].shape, data[1][1].shape, )
+#print (data[0][0].shape, data[0][1].shape, data[1][0].shape, data[1][1].shape, )
 
-print('*'*33)
-#------ build model ------
-#inputs = tf.keras.Input(shape=INPUT_SHAPE, batch_size=BATCHSIZE)
-def model1():
+#------ build models ------
+def make_model1():
     inputs = tf.keras.Input(shape=INPUT_SHAPE)
-    layer1 = tf.keras.layers.Dense( 10, activation='sigmoid')(inputs)
+    layer1 = tf.keras.layers.Dense( 64, activation='sigmoid')(inputs)
     layer2f1 = tf.keras.layers.Dense(3, activation='sigmoid')
     layer2f2 = layer2f1(layer1) # f for fixed
-#layer2f2.trainable=False
     layer2f1.trainable=False
-    layer2t1 = tf.keras.layers.Dense(6, activation='sigmoid')
+    layer2t1 = tf.keras.layers.Dense(48, activation='sigmoid')
     layer2t2 = layer2t1(layer1) # t for trainable
     layer2 = tf.keras.layers.Concatenate()([layer2f2, layer2t2])
     layer3 = tf.keras.layers.Dense(1, activation='sigmoid')(layer2)
     _model = tf.keras.Model( inputs, layer3 )
-#    initial_layer2f_weights_values = layer2f1.get_weights()
-#    initial_layer2t_weights_values = layer2t1.get_weights()
-#    ___trainable, ___untrainable = initial_layer2f_weights_values
     return _model, layer2f1.get_weights(), layer2t1.get_weights(), layer2t1, layer2f1
-model, init_f_weights,init_t_weights, layer2t1, layer2f1 = model1()
+model1, init_f_weights_1,init_t_weights_1, layer2t1_1, layer2f1_1 = make_model1()
+model1.summary()
 
-def model2():
+def make_model2():
     inputs = tf.keras.Input(shape=INPUT_SHAPE)
-    layer1 = tf.keras.layers.Dense( 10, activation='sigmoid')(inputs)
-    layer2t1 = tf.keras.layers.Dense(6, activation='sigmoid')
-    layer2t2 = layer2t1(layer1) # t for trainable
-    layer2 = layer2t2
+    layer1 = tf.keras.layers.Dense( 64, activation='sigmoid')(inputs)
+    layer2t1 = tf.keras.layers.Dense(48, activation='sigmoid')
+    layer2 = layer2t1(layer1) # t for trainable
     layer3 = tf.keras.layers.Dense(1, activation='sigmoid')(layer2)
     _model = tf.keras.Model( inputs, layer3 )
-#    initial_layer2f_weights_values = layer2f1.get_weights()
-#    initial_layer2t_weights_values = layer2t1.get_weights()
-#    ___trainable, ___untrainable = initial_layer2f_weights_values
     return _model, layer2t1.get_weights(), layer2t1
-model, init_t_weights, layer2t1 = model2()
+model2, init_t_weights_2, layer2t1_2 = make_model2()
+model2.summary()
 
-
-
-
-model.summary()
-
-#------ build model ------
+#------ run models ------
 loss_fn = tf.keras.losses.MeanSquaredError()
-#loss_fn = tf.keras.losses.SparseCategoricalCrossEntropy()
-print('>> y_true ', y_train[:1])
-print('>> y_pred ', model(x_train[:1]))
-print('>> mse    ',loss_fn(y_train[:1], model(x_train[:1]).numpy()))
-model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.1) ,
-        loss=loss_fn,
-        metrics=['accuracy'])
+model1.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.001) ,
+        loss=loss_fn, metrics=['accuracy'])
+model1.fit(x_train, y_train, epochs=50)
+model2.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.001) ,
+    loss=loss_fn, metrics=['accuracy'])
+model2.fit(x_train, y_train, epochs=50)
 
-model.fit(x_train, y_train, epochs=10)
-print('*'*33)
-print ('initial trainable weights:')
-print(init_t_weights[0])
-print ('end trainable weights:')
-print(layer2t1.get_weights()[0])
-print ('difference between initial & end trainable weights:')
-print(init_t_weights[0] - layer2t1.get_weights()[0])
-print ('difference between initial & end untrainable weights:')
-print(init_f_weights[0] - layer2f1.get_weights()[0])
-print('*'*33)
+if PRINT_WEIGHTS:
+    print('*'*33)
+    print ('model 1 initial trainable weights:')
+    print(init_t_weights_1[0])
+    print ('model 1 end trainable weights:')
+    print(layer2t1_1.get_weights()[0])
+    print ('difference between initial & end trainable weights:')
+    print(init_t_weights_1[0] - layer2t1_1.get_weights()[0])
+    print ('difference between initial & end untrainable weights:')
+    print(init_f_weights_1[0] - layer2f1_1.get_weights()[0])
+    print('*'*33)
+
+    #print('*'*33)
+    #print ('model 2 initial trainable weights:')
+    #print(init_t_weights_1[0])
+    #print ('model 2 end trainable weights:')
+    #print(layer2t1_1.get_weights()[0])
+    #
 
 
 
+#------- plot histogram ------
+if PLOT_WEIGHTS_HISTOGRAM :
+    print('Plotting...')
+    d_hist = {}
+    model_diffs = np.ndarray.flatten(np.array(
+            (layer2t1_2.get_weights()[0])))
+    model_diffs = np.ndarray.flatten(np.array(
+            (layer2t1_1.get_weights()[0])))
+    model_diffs = np.ndarray.flatten(np.array(
+            (init_t_weights_1[0] - layer2t1_1.get_weights()[0])))
+    X = list(model_diffs )
+    for xi in X:
+        if xi in d_hist: d_hist[xi]+=1
+        else: d_hist[xi]=1
 
+    d_arr = [ d_hist[k] for k in sorted(d_hist.keys())]
+    plt.scatter(d_hist.keys(), d_arr)
+#    plt.rcParams["figure.figsize"] = (10, 20) # (w, h)
+    plt.yscale('log')
+    plt.show()
+    print('Done plotting.')
+
+
+if SANITY:
+    print('>> y_true ', y_train[:1])
+    print('>> y_pred ', model1(x_train[:1]))
+    print('>> mse    ',loss_fn(y_train[:1], model1(x_train[:1]).numpy()))
 
 # test:
 if OLD_TEST:
